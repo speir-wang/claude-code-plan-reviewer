@@ -179,3 +179,67 @@ pre {
   font-style: italic;
   font-size: 0.9rem;
 }
+
+.feedback-controls {
+  max-width: 76rem;
+  margin: 2rem auto 0;
+  padding: 1rem 0;
+  border-top: 1px solid rgba(127, 127, 127, 0.3);
+}
+
+.feedback-controls__row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.feedback-controls__row button {
+  font: inherit;
+  padding: 0.5rem 1rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+  background: #f3f4f6;
+  cursor: pointer;
+}
+
+.feedback-controls__row button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.feedback-controls__row button[data-action='approve'] {
+  background: #059669;
+  color: white;
+  border-color: #047857;
+}
+
+.feedback-controls__notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 40rem;
+}
+
+.feedback-controls__notes h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.feedback-controls__notes textarea {
+  font: inherit;
+  resize: vertical;
+  padding: 0.5rem;
+  border-radius: 0.3rem;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+}
+
+.feedback-controls__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.feedback-controls__status {
+  margin: 0;
+  color: #374151;
+  font-style: italic;
+}

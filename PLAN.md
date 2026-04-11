@@ -63,9 +63,22 @@ for the full checklist.
       highlight, cancel clears, delete removes comment + mark, two anchors
       both highlight. Sidebar layout added to `#workspace` grid +
       `.comments-panel` styles. 46 vitest + 8 Playwright green.
-- [ ] **Step 8 — Browser app: feedback / approval**: submission controls,
-      XML arriving at daemon for both feedback and approval. Playwright
-      test first.
+- [x] **Step 8 — Browser app: feedback / approval**: `FeedbackController`
+      renders three submission buttons (Send Feedback / Approve / Approve
+      with Notes) in a footer bar below the workspace. Send Feedback POSTs
+      the current draft comments to `/api/sessions/:id/feedback`, Approve
+      POSTs empty JSON to `/api/sessions/:id/approve`, Approve-with-Notes
+      opens an inline notes form and POSTs `{ notes }` to the same
+      endpoint. After a successful submission the controls collapse to a
+      `[data-submission-status]` line so the same waiter can't be resolved
+      twice. `AnnotationController.setOnCommentsChanged` re-renders the
+      Send Feedback button's disabled state as drafts are added/deleted.
+      `AnnotationController.getComments()` exposes the draft list via a
+      `CommentSource` interface the feedback module consumes. 5 Playwright
+      tests (daemon on an ephemeral port, pre-registered waiter per test):
+      feedback-with-comments round-trip, enable/disable on comment
+      add/delete, approve, approve-with-notes, cancel-approve-with-notes.
+      46 vitest + 13 Playwright green.
 - [ ] **Step 9 — Browser app: diff view**: two-version session renders
       inline diff, resolved comments visually distinct. Playwright test
       first.
