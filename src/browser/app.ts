@@ -1,5 +1,6 @@
 import { renderPlan } from './plan-display.js';
 import { AnnotationController } from './annotation.js';
+import { FeedbackController } from './feedback.js';
 
 interface SessionResponse {
   session: {
@@ -19,9 +20,11 @@ function setStatus(container: HTMLElement, message: string): void {
 async function main(): Promise<void> {
   const planContainer = document.getElementById('plan-container');
   const commentsPanel = document.getElementById('comments-panel');
+  const feedbackContainer = document.getElementById('feedback-controls');
   if (
     !(planContainer instanceof HTMLElement) ||
-    !(commentsPanel instanceof HTMLElement)
+    !(commentsPanel instanceof HTMLElement) ||
+    !(feedbackContainer instanceof HTMLElement)
   ) {
     return;
   }
@@ -50,12 +53,20 @@ async function main(): Promise<void> {
   }
   renderPlan(planContainer, latest.text);
 
-  const controller = new AnnotationController(
+  const annotation = new AnnotationController(
     planContainer,
     commentsPanel,
     latest.text,
   );
-  controller.start();
+  annotation.start();
+
+  const feedback = new FeedbackController({
+    container: feedbackContainer,
+    sessionId,
+    source: annotation,
+  });
+  feedback.render();
+  annotation.setOnCommentsChanged(() => feedback.render());
 }
 
 void main();

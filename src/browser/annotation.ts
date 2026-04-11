@@ -26,6 +26,7 @@ export class AnnotationController {
   private readonly planText: string;
   private comments: DraftComment[] = [];
   private selection: CurrentSelection | null = null;
+  private onChange: (() => void) | null = null;
 
   constructor(
     planContainer: HTMLElement,
@@ -40,6 +41,16 @@ export class AnnotationController {
   start(): void {
     document.addEventListener('mouseup', this.handleMouseUp);
     this.renderPanel();
+  }
+
+  /** Listener invoked whenever the saved comments list changes. */
+  setOnCommentsChanged(cb: () => void): void {
+    this.onChange = cb;
+  }
+
+  /** Snapshot of the currently saved draft comments. */
+  getComments(): readonly DraftComment[] {
+    return this.comments;
   }
 
   private readonly handleMouseUp = (evt: MouseEvent): void => {
@@ -161,6 +172,7 @@ export class AnnotationController {
     this.selection = null;
     this.highlightAnchor(comment);
     this.renderPanel();
+    this.onChange?.();
   }
 
   private deleteComment(id: string): void {
@@ -171,6 +183,7 @@ export class AnnotationController {
       mark.replaceWith(document.createTextNode(mark.textContent ?? ''));
     }
     this.renderPanel();
+    this.onChange?.();
   }
 
   /**
