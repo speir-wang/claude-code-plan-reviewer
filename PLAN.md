@@ -47,9 +47,22 @@ for the full checklist.
       Playwright global-setup builds the bundle once. Pinned
       `@playwright/test` + `playwright` to `1.56.0` to match the
       pre-installed chromium-1194.
-- [ ] **Step 7 — Browser app: annotation**: text selection → floating "Add
-      comment" button → inline comment editor → margin annotations with
-      connector lines. Playwright test first.
+- [x] **Step 7 — Browser app: annotation**: `AnnotationController` manages
+      draft comments anchored by character range against the raw plan text.
+      Document-level `mouseup` walks from the selection's common ancestor up
+      to the enclosing `[data-plan-block]`, reads `data-offset` /
+      `data-length`, and maps the selected text back to `anchorStart` /
+      `anchorEnd` in the raw markdown (with a block-start fallback when the
+      selection spans markdown decoration). "Add comment" opens an inline
+      form, Save creates a `DraftComment` and wraps the matching text node
+      in `<mark data-comment-id>` via a `TreeWalker` + `range.surroundContents`,
+      Delete removes the comment and unwraps the `<mark>`. Mouseups whose
+      target lives inside the comments panel are ignored so Chromium's
+      mousedown-collapses-selection quirk can't wipe the pending selection
+      before the click handler runs. 4 Playwright tests: save → persist +
+      highlight, cancel clears, delete removes comment + mark, two anchors
+      both highlight. Sidebar layout added to `#workspace` grid +
+      `.comments-panel` styles. 46 vitest + 8 Playwright green.
 - [ ] **Step 8 — Browser app: feedback / approval**: submission controls,
       XML arriving at daemon for both feedback and approval. Playwright
       test first.
