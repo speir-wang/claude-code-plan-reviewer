@@ -26,10 +26,15 @@ for the full checklist.
 - [x] **Step 4 — Diff engine**: `computeInlineDiff` over `diffWords` with
       comment overlap/resolution math (`resolveCommentsAgainstDiff`).
       Pure function, no mutation. 13 unit tests.
-- [ ] **Step 5 — MCP server process**: `submit_plan` tool registration,
-      delegation via `fetch('/internal/submit')` with 1h abort signal,
-      fallback `isError` when broker is down. Integration test spawns real
-      MCP stdio process against real daemon on ephemeral port.
+- [x] **Step 5 — MCP server process**: `submit_plan` tool registered via
+      `McpServer.registerTool` + `StdioServerTransport`; delegates to
+      `fetch('/internal/submit')` with a 1h `AbortSignal.timeout`; returns an
+      `isError` fallback result when the broker is unreachable. 4 integration
+      tests spawn a real stdio MCP process against a real daemon on an
+      ephemeral port: tool listing, feedback round-trip, approval
+      round-trip, dead-broker fallback. `PLAN_REVIEWER_BROKER_URL` env var
+      makes the broker endpoint test-configurable. stdin/stdout reserved
+      for JSON-RPC; fatal errors logged to stderr only.
 - [ ] **Step 6 — Browser app: plan display**: markdown → HTML via `marked`,
       per-paragraph offset attributes. Playwright test first.
 - [ ] **Step 7 — Browser app: annotation**: text selection → floating "Add
