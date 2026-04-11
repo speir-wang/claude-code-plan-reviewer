@@ -23,8 +23,9 @@ for the full checklist.
       with `/api/sessions`, `/:id/events`, `/:id/feedback`, `/:id/approve`
       and the `/internal/submit` long-poll endpoint. Uses `res.on('close')`
       (not `req`) for real disconnect detection.
-- [ ] **Step 4 — Diff engine**: `computeInlineDiff` over `diffWords` with
-      comment overlap/resolution math. Unit-test first.
+- [x] **Step 4 — Diff engine**: `computeInlineDiff` over `diffWords` with
+      comment overlap/resolution math (`resolveCommentsAgainstDiff`).
+      Pure function, no mutation. 13 unit tests.
 - [ ] **Step 5 — MCP server process**: `submit_plan` tool registration,
       delegation via `fetch('/internal/submit')` with 1h abort signal,
       fallback `isError` when broker is down. Integration test spawns real
