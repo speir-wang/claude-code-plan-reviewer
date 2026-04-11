@@ -1,4 +1,5 @@
 import { renderPlan } from './plan-display.js';
+import { AnnotationController } from './annotation.js';
 
 interface SessionResponse {
   session: {
@@ -16,32 +17,45 @@ function setStatus(container: HTMLElement, message: string): void {
 }
 
 async function main(): Promise<void> {
-  const container = document.getElementById('plan-container');
-  if (!(container instanceof HTMLElement)) return;
+  const planContainer = document.getElementById('plan-container');
+  const commentsPanel = document.getElementById('comments-panel');
+  if (
+    !(planContainer instanceof HTMLElement) ||
+    !(commentsPanel instanceof HTMLElement)
+  ) {
+    return;
+  }
 
   const sessionId = new URLSearchParams(window.location.search).get('session');
   if (!sessionId) {
-    setStatus(container, 'No session selected.');
+    setStatus(planContainer, 'No session selected.');
     return;
   }
 
   const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`);
   if (res.status === 404) {
-    setStatus(container, 'Session not found.');
+    setStatus(planContainer, 'Session not found.');
     return;
   }
   if (!res.ok) {
-    setStatus(container, `Failed to load session (HTTP ${res.status}).`);
+    setStatus(planContainer, `Failed to load session (HTTP ${res.status}).`);
     return;
   }
 
   const data = (await res.json()) as SessionResponse;
   const latest = data.session.planVersions.at(-1);
   if (!latest) {
-    setStatus(container, 'Session has no plan versions yet.');
+    setStatus(planContainer, 'Session has no plan versions yet.');
     return;
   }
-  renderPlan(container, latest.text);
+  renderPlan(planContainer, latest.text);
+
+  const controller = new AnnotationController(
+    planContainer,
+    commentsPanel,
+    latest.text,
+  );
+  controller.start();
 }
 
 void main();
