@@ -1,13 +1,23 @@
 import { renderPlan } from './plan-display.js';
 import { AnnotationController } from './annotation.js';
-import { FeedbackController } from './feedback.js';
+import { FeedbackController, type CommentSource } from './feedback.js';
+import { renderDiffView, renderPriorComments } from './diff-view.js';
+import type { Comment } from '../types.js';
+
+interface SessionPlanVersion {
+  version: number;
+  text: string;
+  comments?: Comment[];
+}
 
 interface SessionResponse {
   session: {
     id: string;
-    planVersions: { version: number; text: string }[];
+    planVersions: SessionPlanVersion[];
   };
 }
+
+const EMPTY_SOURCE: CommentSource = { getComments: () => [] };
 
 function setStatus(container: HTMLElement, message: string): void {
   container.replaceChildren();
@@ -46,27 +56,40 @@ async function main(): Promise<void> {
   }
 
   const data = (await res.json()) as SessionResponse;
-  const latest = data.session.planVersions.at(-1);
+  const versions = data.session.planVersions;
+  const latest = versions.at(-1);
   if (!latest) {
     setStatus(planContainer, 'Session has no plan versions yet.');
     return;
   }
-  renderPlan(planContainer, latest.text);
 
-  const annotation = new AnnotationController(
-    planContainer,
-    commentsPanel,
-    latest.text,
-  );
-  annotation.start();
+  const previous = versions.length >= 2 ? versions[versions.length - 2] : undefined;
 
-  const feedback = new FeedbackController({
-    container: feedbackContainer,
-    sessionId,
-    source: annotation,
-  });
-  feedback.render();
-  annotation.setOnCommentsChanged(() => feedback.render());
+  if (previous) {
+    const segments = renderDiffView(planContainer, previous.text, latest.text);
+    renderPriorComments(commentsPanel, previous.comments ?? [], segments);
+    const feedback = new FeedbackController({
+      container: feedbackContainer,
+      sessionId,
+      source: EMPTY_SOURCE,
+    });
+    feedback.render();
+  } else {
+    renderPlan(planContainer, latest.text);
+    const annotation = new AnnotationController(
+      planContainer,
+      commentsPanel,
+      latest.text,
+    );
+    annotation.start();
+    const feedback = new FeedbackController({
+      container: feedbackContainer,
+      sessionId,
+      source: annotation,
+    });
+    feedback.render();
+    annotation.setOnCommentsChanged(() => feedback.render());
+  }
 }
 
 void main();
