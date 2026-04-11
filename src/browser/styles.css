@@ -1,0 +1,58 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  line-height: 1.55;
+}
+
+body {
+  margin: 0;
+  padding: 2rem 1.5rem 4rem;
+  max-width: 48rem;
+  margin-inline: auto;
+}
+
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.plan__status {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.plan-block {
+  padding: 0.25rem 0;
+}
+
+.plan-block h1,
+.plan-block h2,
+.plan-block h3 {
+  margin: 0.25rem 0;
+}
+
+.plan-block p {
+  margin: 0.25rem 0;
+}
+
+.plan-block ul,
+.plan-block ol {
+  margin: 0.25rem 0;
+  padding-inline-start: 1.5rem;
+}
+
+code {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.95em;
+  background: rgba(127, 127, 127, 0.15);
+  padding: 0.05em 0.3em;
+  border-radius: 0.25em;
+}
+
+pre {
+  background: rgba(127, 127, 127, 0.1);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}

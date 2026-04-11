@@ -59,6 +59,8 @@ coverage/
 
 # Testing
 .jest-cache/
+test-results/
+playwright-report/
 
 # Package manager lock files (keep only one)
 # Uncomment the ones you don't use:

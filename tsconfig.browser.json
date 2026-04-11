@@ -15,5 +15,5 @@
     "noUnusedParameters": true,
     "types": []
   },
-  "include": ["src/browser/**/*.ts", "test/browser/**/*.ts"]
+  "include": ["src/browser/**/*.ts"]
 }
