@@ -79,9 +79,25 @@ for the full checklist.
       feedback-with-comments round-trip, enable/disable on comment
       add/delete, approve, approve-with-notes, cancel-approve-with-notes.
       46 vitest + 13 Playwright green.
-- [ ] **Step 9 — Browser app: diff view**: two-version session renders
-      inline diff, resolved comments visually distinct. Playwright test
-      first.
+- [x] **Step 9 — Browser app: diff view**: `renderDiffView` and
+      `renderPriorComments` in `src/browser/diff-view.ts` share
+      `computeInlineDiff` + `resolveCommentsAgainstDiff` with the server by
+      importing `src/diff.ts` and `src/types.ts` directly (browser
+      `tsconfig` now `include`s those files and drops `rootDir` so esbuild
+      can bundle them into `app.js`). When a session carries ≥2 plan
+      versions, `app.ts` switches the plan container to a word-level
+      inline diff (`<ins class="diff-add">` / `<del class="diff-remove">`
+      over plain `<span>` unchanged segments) and swaps the comments panel
+      for a read-only list of the previous version's comments marked
+      `data-resolved="true"` whenever their anchor range overlaps an
+      added/removed/inserted segment. Feedback controls (Step 8) still
+      render in diff-view mode with an empty `CommentSource` so the user
+      can Approve or Approve-with-Notes directly. Single-version sessions
+      fall back to the existing `plan-display` + `AnnotationController`
+      path unchanged. 5 Playwright tests: two-version inline diff, three
+      prior comments with correct open/resolved state, empty prior-
+      comments list, single-version fallthrough, Approve round-trip in
+      diff-view mode. 46 vitest + 18 Playwright green.
 - [ ] **Step 10 — Browser app: conversation + sidebar**: history list,
       session navigation, SSE-driven badges. Playwright tests first.
 - [ ] **Step 11 — Daemon setup**: launchd plist, idempotent install script,
