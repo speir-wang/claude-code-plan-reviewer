@@ -35,8 +35,18 @@ for the full checklist.
       round-trip, dead-broker fallback. `PLAN_REVIEWER_BROKER_URL` env var
       makes the broker endpoint test-configurable. stdin/stdout reserved
       for JSON-RPC; fatal errors logged to stderr only.
-- [ ] **Step 6 — Browser app: plan display**: markdown → HTML via `marked`,
-      per-paragraph offset attributes. Playwright test first.
+- [x] **Step 6 — Browser app: plan display**: vanilla-TS browser bundle
+      (esbuild) with `index.html`, `app.ts`, `plan-display.ts`, `styles.css`.
+      `parsePlanBlocks` splits plan on blank-line boundaries, preserves
+      character offsets, and renders each block via `marked.parse` into a
+      `<div data-plan-block data-offset data-length>` wrapper so future
+      annotations can anchor by range. `app.ts` resolves `?session=<id>`,
+      fetches the latest plan version, and shows helpful status text on
+      error / missing session. 4 Playwright tests (headless chromium):
+      markdown + offsets, list rendering, missing session, no session.
+      Playwright global-setup builds the bundle once. Pinned
+      `@playwright/test` + `playwright` to `1.56.0` to match the
+      pre-installed chromium-1194.
 - [ ] **Step 7 — Browser app: annotation**: text selection → floating "Add
       comment" button → inline comment editor → margin annotations with
       connector lines. Playwright test first.
