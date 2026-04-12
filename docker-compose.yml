@@ -1,0 +1,12 @@
+services:
+  plan-reviewer:
+    build: .
+    container_name: plan-reviewer
+    ports:
+      - "3456:3456"
+    volumes:
+      - plan-reviewer-data:/root/.plan-reviewer
+    restart: unless-stopped
+
+volumes:
+  plan-reviewer-data:
