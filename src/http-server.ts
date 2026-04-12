@@ -3,9 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import type { SessionManager } from './session-manager.js';
-import { SseManager } from './sse-manager.js';
 import {
-  buildApprovalXml,
   buildClarificationXml,
   buildFeedbackXml,
   type FeedbackComment,
@@ -17,12 +15,12 @@ export interface AppOptions {
   openBrowser?: (url: string) => void;
   /** Override the browser bundle dir (defaults to ../browser relative to this file). */
   browserDistDir?: string;
-  /** Max ms to hold a long-poll open before giving up. Defaults to 1 hour. */
-  longPollTimeoutMs?: number;
+  /** Base URL for constructing browser URLs (e.g. "http://127.0.0.1:3456"). */
+  baseUrl?: string;
 }
 
 type ExpressWithLocals = Express & {
-  locals: Express['locals'] & { sse: SseManager; sessions: SessionManager };
+  locals: Express['locals'] & { sessions: SessionManager };
 };
 
 export function createApp(opts: AppOptions): ExpressWithLocals {
@@ -30,12 +28,10 @@ export function createApp(opts: AppOptions): ExpressWithLocals {
     sessionManager,
     openBrowser,
     browserDistDir,
-    longPollTimeoutMs = 60 * 60 * 1000,
+    baseUrl = 'http://127.0.0.1:3456',
   } = opts;
 
   const app = express() as ExpressWithLocals;
-  const sse = new SseManager();
-  app.locals.sse = sse;
   app.locals.sessions = sessionManager;
 
   app.use(express.json({ limit: '5mb' }));
@@ -79,19 +75,15 @@ export function createApp(opts: AppOptions): ExpressWithLocals {
     res.json({ session: s });
   });
 
-  app.get('/api/sessions/:id/events', (req, res) => {
-    sse.attachSession(req.params.id, res);
-  });
-
-  app.get('/api/events', (_req, res) => {
-    sse.attachGlobal(res);
-  });
-
   app.post('/api/sessions/:id/feedback', (req, res) => {
     const sessionId = req.params.id;
     const session = sessionManager.getSession(sessionId);
     if (!session) {
       res.status(404).json({ error: 'session not found' });
+      return;
+    }
+    if (session.status !== 'active') {
+      res.status(409).json({ error: 'session is not active' });
       return;
     }
 
@@ -104,18 +96,11 @@ export function createApp(opts: AppOptions): ExpressWithLocals {
       ? buildClarificationXml(body.clarificationAnswer)
       : buildFeedbackXml(body.comments ?? []);
 
-    const resolved = sessionManager.resolveSession(sessionId, xml);
-    if (!resolved) {
-      res.status(404).json({ error: 'no pending waiter for session' });
-      return;
-    }
-
     sessionManager.addConversationEntry(sessionId, {
       role: 'user',
       type: body.clarificationAnswer ? 'clarification' : 'feedback',
       content: xml,
     });
-    sse.push(sessionId, 'session_updated', { sessionId });
     res.json({ ok: true });
   });
 
@@ -127,19 +112,14 @@ export function createApp(opts: AppOptions): ExpressWithLocals {
       return;
     }
     const notes = (req.body as { notes?: string }).notes;
-    const xml = buildApprovalXml(notes);
-    const resolved = sessionManager.resolveSession(sessionId, xml);
-    if (!resolved) {
-      res.status(404).json({ error: 'no pending waiter for session' });
-      return;
-    }
     sessionManager.markApproved(sessionId, notes);
-    sse.push(sessionId, 'session_closed', { sessionId });
     res.json({ ok: true });
   });
 
-  // --- Internal MCP bridge -------------------------------------------------
-  app.post('/internal/submit', async (req: Request, res: Response) => {
+  // --- Internal MCP bridge (non-blocking) -----------------------------------
+  // Used by secondary MCP server instances (when another instance already owns
+  // the HTTP port). Creates or updates a session and returns immediately.
+  app.post('/internal/submit', (req: Request, res: Response) => {
     const { plan, sessionId } = (req.body ?? {}) as {
       plan?: string;
       sessionId?: string;
@@ -160,40 +140,18 @@ export function createApp(opts: AppOptions): ExpressWithLocals {
         session = sessionManager.addPlanVersion(sessionId, plan);
       } else {
         session = sessionManager.createSession(plan);
-        openBrowser?.(`http://localhost:3456?session=${session.id}`);
+        openBrowser?.(`${baseUrl}?session=${session.id}`);
       }
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
       return;
     }
 
-    sse.push(session.id, 'plan_submitted', {
-      planVersion: session.planVersions.length,
+    res.json({
+      sessionId: session.id,
+      url: `${baseUrl}?session=${session.id}`,
+      version: session.planVersions.length,
     });
-    sse.pushGlobal('session_updated', { sessionId: session.id });
-
-    // Abort the waiter if the MCP process disconnects or we hit the timeout.
-    // Use res.on('close') (not req.on('close')): req's close fires as soon as
-    // the request body stream ends, which happens during normal body parsing.
-    const timeout = setTimeout(() => {
-      sessionManager.cancelWaiter(session.id, 'long-poll timeout');
-    }, longPollTimeoutMs);
-    res.on('close', () => {
-      if (!res.writableEnded) {
-        sessionManager.cancelWaiter(session.id, 'mcp client disconnected');
-      }
-    });
-
-    try {
-      const xml = await sessionManager.waitForUserResponse(session.id);
-      res.json({ xml, sessionId: session.id });
-    } catch (err) {
-      if (!res.headersSent) {
-        res.status(504).json({ error: (err as Error).message });
-      }
-    } finally {
-      clearTimeout(timeout);
-    }
   });
 
   // --- Global error handler ---------------------------------------------------

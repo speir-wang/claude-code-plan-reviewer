@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "description": "Interactive browser-based plan review for Claude Code via MCP",
   "type": "module",
-  "main": "dist/main.js",
+  "main": "dist/mcp-server.js",
   "bin": {
     "plan-reviewer-mcp": "./dist/mcp-server.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/bundle-browser.js",
-    "start": "node dist/main.js",
-    "dev": "tsx src/main.ts",
+    "start": "node dist/mcp-server.js",
+    "dev": "tsx src/mcp-server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run test/unit",

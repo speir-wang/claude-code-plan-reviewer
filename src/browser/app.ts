@@ -23,6 +23,7 @@ interface ConvEntry {
 interface SessionResponse {
   session: {
     id: string;
+    status: string;
     planVersions: SessionPlanVersion[];
     conversation: ConvEntry[];
   };
@@ -54,7 +55,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Sidebar is always initialized (session list + SSE live updates).
+  // Sidebar is always initialized (session list + polling live updates).
   const sidebar = new Sidebar(sidebarContainer);
   void sidebar.init();
 
@@ -111,6 +112,22 @@ async function main(): Promise<void> {
     });
     feedback.render();
     annotation.setOnCommentsChanged(() => feedback.render());
+  }
+
+  // Poll for new plan versions while session is active.
+  if (data.session.status === 'active') {
+    setInterval(async () => {
+      try {
+        const refreshRes = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`);
+        if (!refreshRes.ok) return;
+        const refreshData = (await refreshRes.json()) as SessionResponse;
+        if (refreshData.session.planVersions.length > versions.length) {
+          window.location.reload();
+        }
+      } catch {
+        // Network error — skip this poll cycle.
+      }
+    }, 3000);
   }
 }
 
