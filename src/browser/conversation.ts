@@ -3,6 +3,8 @@
  * feedback, approvals, and clarifications for the current session.
  */
 
+import { formatPreview } from '../conversation-preview.js';
+
 interface ConvEntry {
   role: string;
   type: string;
@@ -49,7 +51,7 @@ export function renderConversation(
     if (entry.type !== 'plan') {
       const preview = document.createElement('p');
       preview.className = 'conversation__preview';
-      preview.textContent = truncate(entry.content, 120);
+      preview.textContent = truncate(formatPreview(entry.type, entry.content), 120);
       el.appendChild(preview);
     }
 

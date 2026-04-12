@@ -146,6 +146,115 @@ describe('MCP end-to-end: submit_plan ↔ daemon bridge', () => {
     expect(xml).toContain('<note>consider greeting more warmly</note>');
   }, 20000);
 
+  it('submit_plan response includes sessionId so follow-up calls can reference it', async () => {
+    const pair = makeMcpClient(harness!.baseUrl);
+    client = pair.client;
+    transport = pair.transport;
+    await client.connect(transport);
+
+    // First call: new plan, no sessionId.
+    const callPromise = client.callTool({
+      name: 'submit_plan',
+      arguments: { plan: '# Plan v1' },
+    });
+
+    let sessionId: string | undefined;
+    for (let i = 0; i < 100 && !sessionId; i++) {
+      const res = await fetch(`${harness!.baseUrl}/api/sessions`);
+      const body = (await res.json()) as { sessions: { id: string }[] };
+      if (body.sessions.length > 0) sessionId = body.sessions[0]!.id;
+      else await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(sessionId).toBeDefined();
+
+    await fetch(
+      `${harness!.baseUrl}/api/sessions/${sessionId}/feedback`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          comments: [{ anchor: 'Plan', note: 'revise' }],
+        }),
+      },
+    );
+
+    const result = (await callPromise) as {
+      content: { type: string; text: string }[];
+    };
+
+    // The response text must contain the sessionId so Claude can pass it
+    // back in the next submit_plan call — without this, a new session is
+    // created and versioning is lost.
+    const text = result.content[0]!.text;
+    expect(text).toContain(sessionId);
+  }, 20000);
+
+  it('follow-up submit_plan with sessionId appends v2 instead of creating new session', async () => {
+    const pair = makeMcpClient(harness!.baseUrl);
+    client = pair.client;
+    transport = pair.transport;
+    await client.connect(transport);
+
+    // First call: new plan.
+    const call1 = client.callTool({
+      name: 'submit_plan',
+      arguments: { plan: '# Plan v1' },
+    });
+
+    let sessionId: string | undefined;
+    for (let i = 0; i < 100 && !sessionId; i++) {
+      const res = await fetch(`${harness!.baseUrl}/api/sessions`);
+      const body = (await res.json()) as { sessions: { id: string }[] };
+      if (body.sessions.length > 0) sessionId = body.sessions[0]!.id;
+      else await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(sessionId).toBeDefined();
+
+    // Resolve with feedback.
+    await fetch(
+      `${harness!.baseUrl}/api/sessions/${sessionId}/feedback`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          comments: [{ anchor: 'Plan', note: 'revise' }],
+        }),
+      },
+    );
+    await call1;
+
+    // Second call: follow-up with same sessionId — should add v2.
+    const call2 = client.callTool({
+      name: 'submit_plan',
+      arguments: { plan: '# Plan v2 (revised)', sessionId },
+    });
+
+    // Wait for waiter to register for v2.
+    for (let i = 0; i < 100; i++) {
+      await new Promise((r) => setTimeout(r, 10));
+      if (harness!.sessionManager.hasPendingWaiter(sessionId!)) break;
+    }
+    expect(harness!.sessionManager.hasPendingWaiter(sessionId!)).toBe(true);
+
+    // Approve v2.
+    await fetch(
+      `${harness!.baseUrl}/api/sessions/${sessionId}/approve`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      },
+    );
+    await call2;
+
+    // Verify: only 1 session exists with 2 plan versions.
+    const sessions = harness!.sessionManager.listSessions();
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]!.planVersions).toHaveLength(2);
+    expect(sessions[0]!.planVersions[0]!.text).toBe('# Plan v1');
+    expect(sessions[0]!.planVersions[1]!.text).toBe('# Plan v2 (revised)');
+  }, 30000);
+
   it('full round-trip: submit_plan resolves on approval', async () => {
     const pair = makeMcpClient(harness!.baseUrl);
     client = pair.client;
@@ -181,7 +290,11 @@ describe('MCP end-to-end: submit_plan ↔ daemon bridge', () => {
       isError?: boolean;
     };
     expect(result.isError).not.toBe(true);
-    expect(result.content[0]!.text).toBe('<plan_review type="approved" />');
+    const text = result.content[0]!.text;
+    expect(text).toContain('<plan_review type="approved" />');
+    // Session ID is included so follow-up calls can reference it.
+    expect(text).toContain('<session_id>');
+    expect(text).toContain(sessionId!);
   }, 20000);
 
   it('returns isError when the broker is unreachable', async () => {
