@@ -118,9 +118,21 @@ for the full checklist.
       5 Playwright tests: session list with badges, SSE live update,
       click-to-navigate, conversation history, no-session hint.
       46 vitest + 23 Playwright green.
-- [ ] **Step 11 — Daemon setup**: launchd plist, idempotent install script,
-      Claude Code `mcpServers` config. Gate: install script dry-run
-      testable.
+- [x] **Step 11 — Daemon setup**: `src/main.ts` daemon entry point creates
+      `SessionManager` + Express app on port 3456 (configurable via
+      `PLAN_REVIEWER_PORT`), graceful shutdown on SIGINT/SIGTERM with
+      `sse.close()` + `closeAllConnections()` + `sm.flush()`, best-effort
+      `open` for macOS browser launch. `com.plan-reviewer.broker.plist`
+      launchd plist with `RunAtLoad` + `KeepAlive`, logs to
+      `/tmp/plan-reviewer.log`. `install.sh` idempotent installer with
+      `--dry-run` flag: builds project, copies dist/package.json/node_modules
+      to `/usr/local/lib/plan-reviewer/`, installs plist to
+      `~/Library/LaunchAgents/`, loads agent via `launchctl`, and merges
+      `mcpServers.plan-reviewer` into `~/.claude/settings.json` with an
+      inline Node script. 3 unit tests: dry-run output verification, no
+      artifact creation, valid bash syntax. Annotation test race condition
+      fixed with `h1.waitFor()` across all test cases.
+      49 vitest + 23 Playwright green.
 - [ ] **Step 12 — End-to-end polish**: error handling, 1h timeout
       handling, graceful shutdown, interrupted-session recovery polish.
       Tests first for each polish item. Final gate.
