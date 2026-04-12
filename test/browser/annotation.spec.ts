@@ -125,6 +125,7 @@ test.describe('annotation', () => {
   }) => {
     const session = harness.sm.createSession(SAMPLE_PLAN);
     await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+    await page.locator('h1').waitFor();
 
     await selectInHeading(page, 'Mode');
     await page.getByRole('button', { name: /add comment/i }).click();
@@ -141,6 +142,7 @@ test.describe('annotation', () => {
   }) => {
     const session = harness.sm.createSession(SAMPLE_PLAN);
     await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+    await page.locator('h1').waitFor();
 
     await selectInHeading(page, 'Dark');
     await page.getByRole('button', { name: /add comment/i }).click();
@@ -161,6 +163,7 @@ test.describe('annotation', () => {
   }) => {
     const session = harness.sm.createSession(SAMPLE_PLAN);
     await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+    await page.locator('h1').waitFor();
 
     // First comment on "Dark"
     await selectInHeading(page, 'Dark');
