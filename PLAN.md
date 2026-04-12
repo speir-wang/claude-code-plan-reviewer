@@ -133,9 +133,19 @@ for the full checklist.
       artifact creation, valid bash syntax. Annotation test race condition
       fixed with `h1.waitFor()` across all test cases.
       49 vitest + 23 Playwright green.
-- [ ] **Step 12 — End-to-end polish**: error handling, 1h timeout
-      handling, graceful shutdown, interrupted-session recovery polish.
-      Tests first for each polish item. Final gate.
+- [x] **Step 12 — End-to-end polish**: Express error-handling middleware
+      returns structured JSON for JSON parse errors and unhandled exceptions
+      (replaces Express's default HTML error page). SSE `safeWrite` wrapper
+      guards against broken-pipe crashes on `res.write()` during push and
+      heartbeat, with `writableEnded` pre-check. New integration tests:
+      long-poll timeout → 504 with short `longPollTimeoutMs`, MCP client
+      disconnect mid-long-poll cleans up waiter, malformed JSON body → 400,
+      non-existent sessionId → 404, JSON error response from error middleware.
+      New session-manager tests: `cancelWaiter` rejects with given reason,
+      returns false when no waiter, `hasPendingWaiter` false after cancel,
+      approved sessions survive reload unchanged, malformed JSON files on
+      disk skipped without crash. 59 vitest + 23 Playwright = 82 tests green.
+      Final quality gate passed.
 
 ---
 

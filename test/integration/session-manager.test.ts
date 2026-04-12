@@ -181,4 +181,55 @@ describe('SessionManager', () => {
       expect(updated.conversation[1]!.role).toBe('user');
     });
   });
+
+  describe('cancelWaiter', () => {
+    it('rejects the pending promise with the given reason', async () => {
+      const s = sm.createSession('plan');
+      const waiter = sm.waitForUserResponse(s.id);
+      const cancelled = sm.cancelWaiter(s.id, 'long-poll timeout');
+      expect(cancelled).toBe(true);
+      await expect(waiter).rejects.toThrow('long-poll timeout');
+    });
+
+    it('returns false when no waiter is pending', () => {
+      const s = sm.createSession('plan');
+      expect(sm.cancelWaiter(s.id, 'no one home')).toBe(false);
+    });
+
+    it('hasPendingWaiter returns false after cancellation', () => {
+      const s = sm.createSession('plan');
+      sm.waitForUserResponse(s.id).catch(() => {}); // prevent unhandled rejection
+      sm.cancelWaiter(s.id, 'test');
+      expect(sm.hasPendingWaiter(s.id)).toBe(false);
+    });
+  });
+
+  describe('interrupted recovery edge cases', () => {
+    it('approved sessions on disk stay approved (not marked interrupted)', async () => {
+      const s = sm.createSession('plan');
+      sm.markApproved(s.id);
+      await sm.flush();
+
+      const sm2 = new SessionManager({ storageDir });
+      await sm2.init();
+      expect(sm2.getSession(s.id)!.status).toBe('approved');
+    });
+
+    it('skips malformed JSON files on disk without crashing', async () => {
+      const { writeFile } = await import('node:fs/promises');
+      await writeFile(path.join(storageDir, 'bad.json'), 'not json', 'utf8');
+
+      const sm2 = new SessionManager({ storageDir });
+      // Should not throw.
+      await sm2.init();
+      // Good sessions should still load.
+      const s = sm.createSession('plan');
+      sm.markApproved(s.id);
+      await sm.flush();
+
+      const sm3 = new SessionManager({ storageDir });
+      await sm3.init();
+      expect(sm3.getSession(s.id)!.status).toBe('approved');
+    });
+  });
 });

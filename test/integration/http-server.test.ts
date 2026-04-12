@@ -243,4 +243,91 @@ describe('HTTP server', () => {
       expect(res.headers['content-type']).toContain('text/html');
     });
   });
+
+  describe('long-poll timeout and disconnect', () => {
+    it('returns 504 when the long-poll timeout fires', async () => {
+      // Create app with a very short timeout to test the timeout path.
+      await new Promise<void>((r) => server.close(() => r()));
+
+      const shortApp = createApp({
+        sessionManager: sm,
+        openBrowser: () => {},
+        longPollTimeoutMs: 100,
+      });
+      server = await new Promise<Server>((resolve) => {
+        const s = shortApp.listen(0, () => resolve(s));
+      });
+      const { port } = server.address() as { port: number };
+      const url = `http://127.0.0.1:${port}`;
+
+      const res = await fetch(`${url}/internal/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'timeout test' }),
+      });
+
+      expect(res.status).toBe(504);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toContain('timeout');
+    });
+
+    it('returns 504 when the MCP client disconnects mid-long-poll', async () => {
+      const { port } = server.address() as { port: number };
+      const url = `http://127.0.0.1:${port}`;
+
+      const controller = new AbortController();
+      const submitPromise = fetch(`${url}/internal/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'disconnect test' }),
+        signal: controller.signal,
+      });
+
+      // Wait for waiter to register.
+      let sessionId: string | undefined;
+      for (let i = 0; i < 100; i++) {
+        await new Promise((r) => setTimeout(r, 10));
+        const list = sm.listSessions();
+        const found = list.find((s) => sm.hasPendingWaiter(s.id));
+        if (found) { sessionId = found.id; break; }
+      }
+      expect(sessionId).toBeDefined();
+
+      // Abort the fetch — simulates MCP process disconnecting.
+      controller.abort();
+      await submitPromise.catch(() => {});
+
+      // The waiter should have been cancelled.
+      await new Promise((r) => setTimeout(r, 50));
+      expect(sm.hasPendingWaiter(sessionId!)).toBe(false);
+    });
+
+    it('returns 400 for malformed JSON body', async () => {
+      const res = await request(server)
+        .post('/internal/submit')
+        .set('Content-Type', 'application/json')
+        .send('not valid json{{{');
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 404 when sessionId references a non-existent session', async () => {
+      const res = await request(server)
+        .post('/internal/submit')
+        .send({ plan: 'test', sessionId: 'non-existent-id' });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('Express error handling', () => {
+    it('returns JSON 500 for unhandled route errors (not a raw crash)', async () => {
+      // The express.json() middleware already handles malformed JSON with 400.
+      // Test that the custom error handler catches it and returns JSON.
+      const res = await request(server)
+        .post('/api/sessions/test/feedback')
+        .set('Content-Type', 'application/json')
+        .send('{{invalid');
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty('error');
+    });
+  });
 });

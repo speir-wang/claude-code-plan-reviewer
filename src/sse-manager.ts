@@ -39,14 +39,14 @@ export class SseManager {
   push(sessionId: string, event: string, data: unknown): void {
     const payload = this.format(event, data);
     const subs = this.perSession.get(sessionId);
-    if (subs) for (const res of subs) res.write(payload);
+    if (subs) for (const res of subs) this.safeWrite(res, payload);
     // Sidebar also wants to know about any session update.
-    for (const res of this.global) res.write(payload);
+    for (const res of this.global) this.safeWrite(res, payload);
   }
 
   pushGlobal(event: string, data: unknown): void {
     const payload = this.format(event, data);
-    for (const res of this.global) res.write(payload);
+    for (const res of this.global) this.safeWrite(res, payload);
   }
 
   close(): void {
@@ -72,11 +72,20 @@ export class SseManager {
     return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   }
 
+  /** Write to an SSE stream, silently ignoring broken-pipe errors. */
+  private safeWrite(res: Response, payload: string): void {
+    try {
+      if (!res.writableEnded) res.write(payload);
+    } catch {
+      // Client already disconnected; the 'close' handler will clean up.
+    }
+  }
+
   private heartbeat(): void {
     const ping = ': ping\n\n';
     for (const set of this.perSession.values()) {
-      for (const res of set) res.write(ping);
+      for (const res of set) this.safeWrite(res, ping);
     }
-    for (const res of this.global) res.write(ping);
+    for (const res of this.global) this.safeWrite(res, ping);
   }
 }
