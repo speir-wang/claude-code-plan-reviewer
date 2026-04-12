@@ -196,6 +196,21 @@ export function createApp(opts: AppOptions): ExpressWithLocals {
     }
   });
 
+  // --- Global error handler ---------------------------------------------------
+  // Catches JSON parse errors from express.json() and any unexpected throws so
+  // they always return structured JSON (not Express's default HTML).
+  app.use(
+    (
+      err: Error & { status?: number; type?: string },
+      _req: Request,
+      res: Response,
+      _next: express.NextFunction,
+    ) => {
+      const status = err.status ?? 500;
+      res.status(status).json({ error: err.message || 'internal error' });
+    },
+  );
+
   return app;
 }
 
