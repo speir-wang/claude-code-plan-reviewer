@@ -79,11 +79,10 @@ test.describe('feedback / approval submission', () => {
     await stopDaemon(harness);
   });
 
-  test('Send Feedback POSTs comments and resolves waiter with feedback XML', async ({
+  test('Send Feedback POSTs comments and stores feedback in conversation', async ({
     page,
   }) => {
     const session = harness.sm.createSession(SAMPLE_PLAN);
-    const waiter = harness.sm.waitForUserResponse(session.id);
 
     await page.goto(`${harness.baseUrl}/?session=${session.id}`);
     await page.locator('h1').waitFor();
@@ -103,23 +102,21 @@ test.describe('feedback / approval submission', () => {
     await expect(sendBtn).toBeEnabled();
     await sendBtn.click();
 
-    const xml = await waiter;
-    expect(xml).toContain('<plan_review type="feedback">');
-    expect(xml).toContain('<anchor>Dark</anchor>');
-    expect(xml).toContain('<note>Please clarify &quot;dark&quot;.</note>');
-
     // After submission the controls hide themselves and show a status line.
     await expect(page.locator('[data-submission-status]')).toBeVisible();
     await expect(page.locator('[data-action="send-feedback"]')).toHaveCount(0);
+
+    // Verify feedback was stored in the session conversation.
+    const feedback = harness.sm.getLatestFeedback(session.id);
+    expect(feedback).not.toBeNull();
+    expect(feedback!.content).toContain('<plan_review type="feedback">');
+    expect(feedback!.content).toContain('<anchor>Dark</anchor>');
   });
 
   test('Send Feedback is disabled until at least one comment is saved', async ({
     page,
   }) => {
     const session = harness.sm.createSession(SAMPLE_PLAN);
-    harness.sm.waitForUserResponse(session.id).catch(() => {
-      /* aborted when the test tears the server down */
-    });
 
     await page.goto(`${harness.baseUrl}/?session=${session.id}`);
 
@@ -140,30 +137,25 @@ test.describe('feedback / approval submission', () => {
     await expect(sendBtn).toBeDisabled();
   });
 
-  test('Approve resolves the waiter with <plan_review type="approved" />', async ({
+  test('Approve marks session as approved', async ({
     page,
   }) => {
     const session = harness.sm.createSession(SAMPLE_PLAN);
-    const waiter = harness.sm.waitForUserResponse(session.id);
 
     await page.goto(`${harness.baseUrl}/?session=${session.id}`);
 
     await page.locator('[data-action="approve"]').click();
 
-    const xml = await waiter;
-    expect(xml).toBe('<plan_review type="approved" />');
-
     // Session status on the server flips to 'approved'.
+    await expect(page.locator('[data-submission-status]')).toBeVisible();
     expect(harness.sm.getSession(session.id)!.status).toBe('approved');
 
     // UI confirms submission.
-    await expect(page.locator('[data-submission-status]')).toBeVisible();
     await expect(page.locator('[data-action="approve"]')).toHaveCount(0);
   });
 
-  test('Approve with notes submits approved_with_notes XML', async ({ page }) => {
+  test('Approve with notes submits approved_with_notes', async ({ page }) => {
     const session = harness.sm.createSession(SAMPLE_PLAN);
-    const waiter = harness.sm.waitForUserResponse(session.id);
 
     await page.goto(`${harness.baseUrl}/?session=${session.id}`);
 
@@ -173,16 +165,15 @@ test.describe('feedback / approval submission', () => {
     await notes.fill('watch perf under heavy load');
     await page.locator('[data-action="submit-notes"]').click();
 
-    const xml = await waiter;
-    expect(xml).toContain('<plan_review type="approved_with_notes">');
-    expect(xml).toContain('<note>watch perf under heavy load</note>');
+    await expect(page.locator('[data-submission-status]')).toBeVisible();
+    const approval = harness.sm.getSession(session.id)!.approval;
+    expect(approval).toBeDefined();
+    expect(approval!.type).toBe('approved_with_notes');
+    expect(approval!.notes).toBe('watch perf under heavy load');
   });
 
   test('Approve-with-Notes can be cancelled before submitting', async ({ page }) => {
     const session = harness.sm.createSession(SAMPLE_PLAN);
-    harness.sm.waitForUserResponse(session.id).catch(() => {
-      /* aborted on teardown */
-    });
 
     await page.goto(`${harness.baseUrl}/?session=${session.id}`);
 

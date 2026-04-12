@@ -17,8 +17,8 @@ describe('install.sh --dry-run', () => {
     expect(output).toContain('[dry-run]');
     expect(output).toContain('npm run build');
     expect(output).toContain('plan-reviewer');
-    expect(output).toContain('LaunchAgents');
     expect(output).toContain('settings.json');
+    expect(output).toContain('asyncRewake');
   });
 
   it('does not create any install artifacts during dry-run', () => {
@@ -27,7 +27,7 @@ describe('install.sh --dry-run', () => {
       cwd: PROJECT_ROOT,
     });
     // The install target should not have been created.
-    expect(existsSync('/usr/local/lib/plan-reviewer/dist/main.js')).toBe(false);
+    expect(existsSync('/usr/local/lib/plan-reviewer/dist/mcp-server.js')).toBe(false);
   });
 
   it('install.sh exists and is a valid shell script', () => {

@@ -168,14 +168,13 @@ test.describe('diff view', () => {
   test('feedback controls still work in diff view mode', async ({ page }) => {
     const session = harness.sm.createSession(V1);
     harness.sm.addPlanVersion(session.id, V2);
-    const waiter = harness.sm.waitForUserResponse(session.id);
 
     await page.goto(`${harness.baseUrl}/?session=${session.id}`);
 
     await expect(page.locator('[data-diff-view]')).toBeVisible();
     await page.locator('[data-action="approve"]').click();
 
-    const xml = await waiter;
-    expect(xml).toBe('<plan_review type="approved" />');
+    await expect(page.locator('[data-submission-status]')).toBeVisible();
+    expect(harness.sm.getSession(session.id)!.status).toBe('approved');
   });
 });

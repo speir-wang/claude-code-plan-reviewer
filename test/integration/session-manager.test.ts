@@ -19,6 +19,7 @@ describe('SessionManager', () => {
   });
 
   afterEach(async () => {
+    await sm.flush();
     await rm(storageDir, { recursive: true, force: true });
   });
 
@@ -80,59 +81,6 @@ describe('SessionManager', () => {
     });
   });
 
-  describe('blocking bridge', () => {
-    it('waitForUserResponse resolves when resolveSession is called', async () => {
-      const s = sm.createSession('plan');
-      const responsePromise = sm.waitForUserResponse(s.id);
-
-      // Resolve on next tick
-      setImmediate(() => {
-        const ok = sm.resolveSession(s.id, '<plan_review type="approved" />');
-        expect(ok).toBe(true);
-      });
-
-      const xml = await responsePromise;
-      expect(xml).toBe('<plan_review type="approved" />');
-    });
-
-    it('resolveSession returns false when no waiter is pending', () => {
-      const s = sm.createSession('plan');
-      expect(sm.resolveSession(s.id, '<x/>')).toBe(false);
-    });
-
-    it('concurrent sessions do not cross-resolve', async () => {
-      const a = sm.createSession('A');
-      const b = sm.createSession('B');
-
-      const pa = sm.waitForUserResponse(a.id);
-      const pb = sm.waitForUserResponse(b.id);
-
-      sm.resolveSession(a.id, 'xml-A');
-      // b should still be pending; race it against a short timer
-      const bResult = await Promise.race([
-        pb,
-        new Promise<string>((r) => setTimeout(() => r('STILL_PENDING'), 20)),
-      ]);
-      expect(bResult).toBe('STILL_PENDING');
-
-      sm.resolveSession(b.id, 'xml-B');
-      await expect(pa).resolves.toBe('xml-A');
-      await expect(pb).resolves.toBe('xml-B');
-    });
-
-    it('waitForUserResponse rejects old waiter if a new one replaces it', async () => {
-      const s = sm.createSession('plan');
-      const first = sm.waitForUserResponse(s.id);
-      const second = sm.waitForUserResponse(s.id);
-
-      // The first waiter should be abandoned / rejected
-      await expect(first).rejects.toThrow(/superseded/i);
-
-      sm.resolveSession(s.id, 'xml');
-      await expect(second).resolves.toBe('xml');
-    });
-  });
-
   describe('persistence and recovery', () => {
     it('loads existing sessions from disk on init', async () => {
       const s = sm.createSession('plan');
@@ -146,7 +94,7 @@ describe('SessionManager', () => {
       expect(loaded!.planVersions).toHaveLength(2);
     });
 
-    it('marks active-on-disk sessions as interrupted on reload (no pending waiter)', async () => {
+    it('active sessions on disk remain active after reload', async () => {
       const s = sm.createSession('plan');
       expect(s.status).toBe('active');
       await sm.flush();
@@ -154,7 +102,7 @@ describe('SessionManager', () => {
       const sm2 = new SessionManager({ storageDir });
       await sm2.init();
       const loaded = sm2.getSession(s.id);
-      expect(loaded!.status).toBe('interrupted');
+      expect(loaded!.status).toBe('active');
     });
 
     it('listSessions returns sessions sorted by updatedAt desc', async () => {
@@ -182,25 +130,45 @@ describe('SessionManager', () => {
     });
   });
 
-  describe('cancelWaiter', () => {
-    it('rejects the pending promise with the given reason', async () => {
-      const s = sm.createSession('plan');
-      const waiter = sm.waitForUserResponse(s.id);
-      const cancelled = sm.cancelWaiter(s.id, 'long-poll timeout');
-      expect(cancelled).toBe(true);
-      await expect(waiter).rejects.toThrow('long-poll timeout');
+  describe('getLatestFeedback', () => {
+    it('returns null when only a plan entry exists (no user response yet)', () => {
+      const s = sm.createSession('plan v1');
+      expect(sm.getLatestFeedback(s.id)).toBeNull();
     });
 
-    it('returns false when no waiter is pending', () => {
-      const s = sm.createSession('plan');
-      expect(sm.cancelWaiter(s.id, 'no one home')).toBe(false);
+    it('returns the user feedback entry that follows the last plan', () => {
+      const s = sm.createSession('plan v1');
+      sm.addConversationEntry(s.id, {
+        role: 'user',
+        type: 'feedback',
+        content: 'looks good but needs a section on rollback',
+      });
+      const feedback = sm.getLatestFeedback(s.id);
+      expect(feedback).not.toBeNull();
+      expect(feedback!.role).toBe('user');
+      expect(feedback!.type).toBe('feedback');
+      expect(feedback!.content).toBe('looks good but needs a section on rollback');
     });
 
-    it('hasPendingWaiter returns false after cancellation', () => {
-      const s = sm.createSession('plan');
-      sm.waitForUserResponse(s.id).catch(() => {}); // prevent unhandled rejection
-      sm.cancelWaiter(s.id, 'test');
-      expect(sm.hasPendingWaiter(s.id)).toBe(false);
+    it('returns null after a new plan version is added (no feedback for latest version yet)', () => {
+      const s = sm.createSession('plan v1');
+      sm.addConversationEntry(s.id, {
+        role: 'user',
+        type: 'feedback',
+        content: 'needs more detail',
+      });
+      // Author submits a revised plan; feedback above is now "before" the latest plan
+      sm.addPlanVersion(s.id, 'plan v2 with more detail');
+      expect(sm.getLatestFeedback(s.id)).toBeNull();
+    });
+
+    it('returns the approval entry when the session has been approved', () => {
+      const s = sm.createSession('plan v1');
+      sm.markApproved(s.id, 'ship it');
+      const feedback = sm.getLatestFeedback(s.id);
+      expect(feedback).not.toBeNull();
+      expect(feedback!.role).toBe('user');
+      expect(feedback!.type).toBe('approval');
     });
   });
 

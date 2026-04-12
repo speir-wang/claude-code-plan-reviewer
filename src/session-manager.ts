@@ -8,6 +8,7 @@ import type {
   Session,
   SessionApproval,
 } from './types.js';
+import { buildApprovalXml } from './xml.js';
 
 export interface SessionManagerOptions {
   storageDir?: string;
@@ -15,23 +16,13 @@ export interface SessionManagerOptions {
 
 export const DEFAULT_STORAGE_DIR = path.join(homedir(), '.plan-reviewer', 'sessions');
 
-type Resolver = (xml: string) => void;
-type Rejecter = (err: Error) => void;
-
-interface PendingWaiter {
-  resolve: Resolver;
-  reject: Rejecter;
-}
-
 /**
  * SessionManager is the single source of truth for plan-review sessions.
- * It owns session lifecycle, disk persistence, and the blocking bridge that
- * connects an in-flight MCP tool call to the user's eventual browser response.
+ * It owns session lifecycle and disk persistence.
  */
 export class SessionManager {
   private readonly storageDir: string;
   private readonly sessions = new Map<string, Session>();
-  private readonly pending = new Map<string, PendingWaiter>();
   private readonly writeQueue = new Map<string, Promise<void>>();
 
   constructor(opts: SessionManagerOptions = {}) {
@@ -46,13 +37,6 @@ export class SessionManager {
       try {
         const raw = await readFile(path.join(this.storageDir, name), 'utf8');
         const session = JSON.parse(raw) as Session;
-        // Any session found on disk in active state has no live waiter —
-        // the broker must have crashed mid-review.
-        if (session.status === 'active') {
-          session.status = 'interrupted';
-          session.updatedAt = new Date().toISOString();
-          await this.persist(session);
-        }
         this.sessions.set(session.id, session);
       } catch {
         // Skip malformed files silently; surface via a future error channel.
@@ -136,7 +120,7 @@ export class SessionManager {
     session.conversation.push({
       role: 'user',
       type: 'approval',
-      content: notes ?? '',
+      content: buildApprovalXml(notes),
       timestamp: session.updatedAt,
     });
     this.schedulePersist(session);
@@ -159,43 +143,20 @@ export class SessionManager {
   }
 
   /**
-   * Blocking bridge: the MCP process awaits this Promise while the user
-   * reviews the plan in the browser. It resolves when the browser POSTs
-   * feedback or approval.
-   *
-   * If a second waiter registers for the same session (e.g. the tool is
-   * called again before the first response arrives), the earlier waiter is
-   * rejected with a "superseded" error so no Promise is orphaned.
+   * Returns the most recent user feedback/approval entry that arrived after
+   * the last plan submission, or null if the plan is still under review.
    */
-  waitForUserResponse(sessionId: string): Promise<string> {
-    const existing = this.pending.get(sessionId);
-    if (existing) {
-      existing.reject(new Error('waiter superseded by a newer submission'));
-      this.pending.delete(sessionId);
-    }
-    return new Promise<string>((resolve, reject) => {
-      this.pending.set(sessionId, { resolve, reject });
-    });
-  }
-
-  resolveSession(sessionId: string, xmlResponse: string): boolean {
-    const waiter = this.pending.get(sessionId);
-    if (!waiter) return false;
-    this.pending.delete(sessionId);
-    waiter.resolve(xmlResponse);
-    return true;
-  }
-
-  cancelWaiter(sessionId: string, reason: string): boolean {
-    const waiter = this.pending.get(sessionId);
-    if (!waiter) return false;
-    this.pending.delete(sessionId);
-    waiter.reject(new Error(reason));
-    return true;
-  }
-
-  hasPendingWaiter(sessionId: string): boolean {
-    return this.pending.has(sessionId);
+  getLatestFeedback(sessionId: string): ConversationEntry | null {
+    const session = this.requireSession(sessionId);
+    const lastPlanIdx = [...session.conversation].reverse().findIndex(
+      (e) => e.role === 'claude' && e.type === 'plan',
+    );
+    if (lastPlanIdx === -1) return null;
+    const lastPlanPos = session.conversation.length - 1 - lastPlanIdx;
+    const userEntry = session.conversation.slice(lastPlanPos + 1).find(
+      (e) => e.role === 'user',
+    );
+    return userEntry ?? null;
   }
 
   private requireSession(sessionId: string): Session {

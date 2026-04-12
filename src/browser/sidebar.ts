@@ -1,9 +1,9 @@
 /**
- * Sidebar: session list with status badges and SSE-driven live updates.
+ * Sidebar: session list with status badges and polling-based live updates.
  *
- * On init, fetches `/api/sessions` for the current list, then subscribes to
- * `/api/events` (global SSE stream). Any `session_updated` or
- * `session_closed` event triggers a re-fetch so the list stays fresh.
+ * On init, fetches `/api/sessions` for the current list, then starts a
+ * polling loop that re-fetches the list every 3 seconds so the list stays
+ * fresh.
  */
 
 interface SidebarSession {
@@ -24,7 +24,7 @@ export class Sidebar {
   async init(): Promise<void> {
     await this.fetchSessions();
     this.render();
-    this.subscribe();
+    this.startPolling();
   }
 
   private async fetchSessions(): Promise<void> {
@@ -38,14 +38,10 @@ export class Sidebar {
     }
   }
 
-  private subscribe(): void {
-    const es = new EventSource('/api/events');
-    const refresh = () => {
+  private startPolling(): void {
+    setInterval(() => {
       void this.fetchSessions().then(() => this.render());
-    };
-    es.addEventListener('session_updated', refresh);
-    es.addEventListener('session_closed', refresh);
-    es.addEventListener('plan_submitted', refresh);
+    }, 3000);
   }
 
   private render(): void {
