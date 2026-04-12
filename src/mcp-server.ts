@@ -47,11 +47,18 @@ async function forwardSubmitPlan(
         `Plan Reviewer broker returned HTTP ${response.status}: ${detail || response.statusText}`,
       );
     }
-    const body = (await response.json()) as { xml?: unknown };
+    const body = (await response.json()) as { xml?: unknown; sessionId?: unknown };
     if (typeof body.xml !== 'string') {
       return errorResult('Plan Reviewer broker returned a response with no xml field.');
     }
-    return { content: [{ type: 'text', text: body.xml }] };
+    // Include the sessionId in the response so Claude can pass it back on
+    // follow-up submit_plan calls. Without this, each call creates a new
+    // session instead of appending a new version to the existing one.
+    const text =
+      typeof body.sessionId === 'string'
+        ? `${body.xml}\n\n<session_id>${body.sessionId}</session_id>`
+        : body.xml;
+    return { content: [{ type: 'text', text }] };
   } catch {
     return errorResult(BROKER_UNAVAILABLE_MESSAGE);
   }

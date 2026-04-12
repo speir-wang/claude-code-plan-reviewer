@@ -147,6 +147,98 @@ test.describe('sidebar + conversation', () => {
     await expect(feedbackEntry).toHaveAttribute('data-type', 'feedback');
   });
 
+  test('feedback conversation preview does not show raw XML tags', async ({
+    page,
+  }) => {
+    const session = harness.sm.createSession('Plan version one.');
+    harness.sm.addConversationEntry(session.id, {
+      role: 'user',
+      type: 'feedback',
+      content: `<plan_review type="feedback">
+  <comment>
+    <anchor>Create ~/reagroup/hello.txt</anchor>
+    <note>Why this specific file?</note>
+  </comment>
+</plan_review>`,
+    });
+
+    await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+
+    const feedbackEntry = page.locator(
+      '[data-conversation-entry][data-type="feedback"]',
+    );
+    await expect(feedbackEntry).toBeVisible();
+
+    const preview = feedbackEntry.locator('.conversation__preview');
+    await expect(preview).toBeVisible();
+
+    // Should NOT contain raw XML tags.
+    const text = await preview.textContent();
+    expect(text).not.toContain('<plan_review');
+    expect(text).not.toContain('<comment>');
+    expect(text).not.toContain('<anchor>');
+    expect(text).not.toContain('<note>');
+
+    // Should contain the human-readable content.
+    expect(text).toContain('Create ~/reagroup/hello.txt');
+    expect(text).toContain('Why this specific file?');
+  });
+
+  test('clarification conversation preview shows answer without XML', async ({
+    page,
+  }) => {
+    const session = harness.sm.createSession('Plan version one.');
+    harness.sm.addConversationEntry(session.id, {
+      role: 'user',
+      type: 'clarification',
+      content: `<plan_review type="clarification">
+  <answer>use option B</answer>
+</plan_review>`,
+    });
+
+    await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+
+    const entry = page.locator(
+      '[data-conversation-entry][data-type="clarification"]',
+    );
+    await expect(entry).toBeVisible();
+
+    const preview = entry.locator('.conversation__preview');
+    const text = await preview.textContent();
+    expect(text).not.toContain('<plan_review');
+    expect(text).not.toContain('<answer>');
+    expect(text).toContain('use option B');
+  });
+
+  test('multi-comment feedback preview shows comment count', async ({
+    page,
+  }) => {
+    const session = harness.sm.createSession('Plan version one.');
+    harness.sm.addConversationEntry(session.id, {
+      role: 'user',
+      type: 'feedback',
+      content: `<plan_review type="feedback">
+  <comment>
+    <anchor>anchor1</anchor>
+    <note>note1</note>
+  </comment>
+  <comment>
+    <anchor>anchor2</anchor>
+    <note>note2</note>
+  </comment>
+</plan_review>`,
+    });
+
+    await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+
+    const preview = page
+      .locator('[data-conversation-entry][data-type="feedback"]')
+      .locator('.conversation__preview');
+    const text = await preview.textContent();
+    expect(text).not.toContain('<');
+    expect(text).toMatch(/2 comments/i);
+  });
+
   test('no session selected shows sidebar and a "select a session" hint', async ({
     page,
   }) => {
