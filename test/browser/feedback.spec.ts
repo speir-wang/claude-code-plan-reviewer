@@ -34,6 +34,7 @@ async function startDaemon(): Promise<Harness> {
 }
 
 async function stopDaemon(h: Harness): Promise<void> {
+  h.server.closeAllConnections();
   await new Promise<void>((r) => h.server.close(() => r()));
   await h.sm.flush();
   await rm(h.storageDir, { recursive: true, force: true });
@@ -85,6 +86,7 @@ test.describe('feedback / approval submission', () => {
     const waiter = harness.sm.waitForUserResponse(session.id);
 
     await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+    await page.locator('h1').waitFor();
 
     // Add a draft comment anchored on "Dark".
     await selectInHeading(page, 'Dark');

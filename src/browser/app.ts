@@ -2,6 +2,8 @@ import { renderPlan } from './plan-display.js';
 import { AnnotationController } from './annotation.js';
 import { FeedbackController, type CommentSource } from './feedback.js';
 import { renderDiffView, renderPriorComments } from './diff-view.js';
+import { Sidebar } from './sidebar.js';
+import { renderConversation } from './conversation.js';
 import type { Comment } from '../types.js';
 
 interface SessionPlanVersion {
@@ -10,10 +12,19 @@ interface SessionPlanVersion {
   comments?: Comment[];
 }
 
+interface ConvEntry {
+  role: string;
+  type: string;
+  content: string;
+  timestamp: string;
+  planVersion?: number;
+}
+
 interface SessionResponse {
   session: {
     id: string;
     planVersions: SessionPlanVersion[];
+    conversation: ConvEntry[];
   };
 }
 
@@ -31,13 +42,21 @@ async function main(): Promise<void> {
   const planContainer = document.getElementById('plan-container');
   const commentsPanel = document.getElementById('comments-panel');
   const feedbackContainer = document.getElementById('feedback-controls');
+  const sidebarContainer = document.getElementById('sidebar');
+  const conversationContainer = document.getElementById('conversation');
   if (
     !(planContainer instanceof HTMLElement) ||
     !(commentsPanel instanceof HTMLElement) ||
-    !(feedbackContainer instanceof HTMLElement)
+    !(feedbackContainer instanceof HTMLElement) ||
+    !(sidebarContainer instanceof HTMLElement) ||
+    !(conversationContainer instanceof HTMLElement)
   ) {
     return;
   }
+
+  // Sidebar is always initialized (session list + SSE live updates).
+  const sidebar = new Sidebar(sidebarContainer);
+  void sidebar.init();
 
   const sessionId = new URLSearchParams(window.location.search).get('session');
   if (!sessionId) {
@@ -62,6 +81,9 @@ async function main(): Promise<void> {
     setStatus(planContainer, 'Session has no plan versions yet.');
     return;
   }
+
+  // Conversation history.
+  renderConversation(conversationContainer, data.session.conversation);
 
   const previous = versions.length >= 2 ? versions[versions.length - 2] : undefined;
 

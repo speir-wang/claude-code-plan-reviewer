@@ -34,6 +34,7 @@ async function startDaemon(): Promise<Harness> {
 }
 
 async function stopDaemon(h: Harness): Promise<void> {
+  h.server.closeAllConnections();
   await new Promise<void>((r) => h.server.close(() => r()));
   await h.sm.flush();
   await rm(h.storageDir, { recursive: true, force: true });
@@ -108,7 +109,7 @@ test.describe('plan display', () => {
     const session = harness.sm.createSession(SAMPLE_PLAN);
     await page.goto(`${harness.baseUrl}/?session=${session.id}`);
 
-    const items = page.locator('li');
+    const items = page.locator('#plan-container li');
     await expect(items).toHaveCount(3);
     await expect(items.first()).toContainText('system preference');
   });
