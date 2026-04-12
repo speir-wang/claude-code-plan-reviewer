@@ -34,6 +34,7 @@ async function startDaemon(): Promise<Harness> {
 }
 
 async function stopDaemon(h: Harness): Promise<void> {
+  h.server.closeAllConnections();
   await new Promise<void>((r) => h.server.close(() => r()));
   await h.sm.flush();
   await rm(h.storageDir, { recursive: true, force: true });

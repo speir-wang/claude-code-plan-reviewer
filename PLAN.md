@@ -98,8 +98,26 @@ for the full checklist.
       prior comments with correct open/resolved state, empty prior-
       comments list, single-version fallthrough, Approve round-trip in
       diff-view mode. 46 vitest + 18 Playwright green.
-- [ ] **Step 10 — Browser app: conversation + sidebar**: history list,
-      session navigation, SSE-driven badges. Playwright tests first.
+- [x] **Step 10 — Browser app: conversation + sidebar**: `Sidebar` in
+      `sidebar.ts` fetches `/api/sessions` on init, subscribes to the global
+      SSE stream (`/api/events`), and re-renders on `session_updated` /
+      `session_closed` / `plan_submitted` events so the session list stays
+      live. Each card shows a truncated session ID, a `data-status` colour
+      badge (active / approved / interrupted), and the current plan-version
+      count. Clicking a card navigates to `/?session=<id>`.
+      `renderConversation` in `conversation.ts` shows a timeline of
+      `ConversationEntry` items with role markers (Claude / You), type
+      labels (Plan v_N_, Feedback, Approved, Clarification), formatted
+      timestamps, and a truncated content preview for non-plan entries.
+      `index.html` gains an `#app-layout` two-column grid wrapping
+      `<nav data-sidebar>` and `#main-area` (conversation + workspace +
+      feedback). All previous browser test harnesses updated with
+      `server.closeAllConnections()` so the sidebar's persistent SSE
+      connection doesn't block teardown. `plan-display` `li` selector
+      scoped to `#plan-container` to avoid sidebar list-item collision.
+      5 Playwright tests: session list with badges, SSE live update,
+      click-to-navigate, conversation history, no-session hint.
+      46 vitest + 23 Playwright green.
 - [ ] **Step 11 — Daemon setup**: launchd plist, idempotent install script,
       Claude Code `mcpServers` config. Gate: install script dry-run
       testable.
