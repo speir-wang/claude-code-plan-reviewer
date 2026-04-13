@@ -6,11 +6,12 @@
 #   bash install.sh --dry-run  # print what would happen, change nothing
 #
 # Steps:
-#   1. Build the project (npm run build).
-#   2. Copy dist/ to /usr/local/lib/plan-reviewer/.
-#   3. Merge the plan-reviewer MCP entry into ~/.claude/settings.json.
-#   4. Copy the asyncRewake poll script.
-#   5. Add the PostToolUse hook configuration to settings.json.
+#   1. Install dependencies (npm install).
+#   2. Build the project (npm run build).
+#   3. Copy dist/ to /usr/local/lib/plan-reviewer/.
+#   4. Merge the plan-reviewer MCP entry into ~/.claude/settings.json.
+#   5. Copy the asyncRewake poll script.
+#   6. Add the PostToolUse hook configuration to settings.json.
 
 set -euo pipefail
 
@@ -36,12 +37,16 @@ log() {
   echo "==> $*"
 }
 
-# --- Step 1: Build -----------------------------------------------------------
-log "Building project (npm run build)…"
+# --- Step 1: Install dependencies --------------------------------------------
+log "Installing dependencies (npm install)..."
+run npm install --prefix "$PROJECT_DIR"
+
+# --- Step 2: Build -----------------------------------------------------------
+log "Building project (npm run build)..."
 run npm run build --prefix "$PROJECT_DIR"
 
-# --- Step 2: Install dist ----------------------------------------------------
-log "Copying dist/ to $INSTALL_DIR…"
+# --- Step 3: Install dist ----------------------------------------------------
+log "Copying dist/ to $INSTALL_DIR..."
 run mkdir -p "$INSTALL_DIR"
 if ! $DRY_RUN; then
   cp -R "$PROJECT_DIR/dist" "$INSTALL_DIR/"
@@ -54,8 +59,8 @@ else
   echo "[dry-run] cp -R dist/, package.json, node_modules/, scripts/ to $INSTALL_DIR/"
 fi
 
-# --- Step 3: Merge Claude Code settings.json ---------------------------------
-log "Merging plan-reviewer MCP entry into $CLAUDE_SETTINGS…"
+# --- Step 4: Merge Claude Code settings.json ---------------------------------
+log "Merging plan-reviewer MCP entry into $CLAUDE_SETTINGS..."
 if ! $DRY_RUN; then
   mkdir -p "$(dirname "$CLAUDE_SETTINGS")"
   node -e "
@@ -76,8 +81,8 @@ else
   echo "[dry-run]   args: [$INSTALL_DIR/dist/mcp-server.js]"
 fi
 
-# --- Step 4: Add asyncRewake hook --------------------------------------------
-log "Adding PostToolUse asyncRewake hook to $CLAUDE_SETTINGS…"
+# --- Step 5: Add asyncRewake hook --------------------------------------------
+log "Adding PostToolUse asyncRewake hook to $CLAUDE_SETTINGS..."
 if ! $DRY_RUN; then
   node -e "
     const fs = require('fs');
