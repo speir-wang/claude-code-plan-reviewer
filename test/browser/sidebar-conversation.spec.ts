@@ -253,4 +253,42 @@ test.describe('sidebar + conversation', () => {
     // Plan area shows the "no session selected" hint.
     await expect(page.locator('body')).toContainText(/no session selected/i);
   });
+
+  test('empty sidebar shows "No sessions yet." placeholder', async ({ page }) => {
+    // No sessions created — sidebar should show placeholder.
+    await page.goto(`${harness.baseUrl}/`);
+
+    const sidebar = page.locator('[data-sidebar]');
+    await expect(sidebar).toBeVisible();
+    await expect(sidebar.locator('.sidebar__empty')).toBeVisible();
+    await expect(sidebar.locator('.sidebar__empty')).toContainText('No sessions yet.');
+  });
+
+  test('approval conversation entry shows data-type="approval"', async ({ page }) => {
+    const session = harness.sm.createSession('Plan to approve.');
+    harness.sm.markApproved(session.id);
+
+    await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+
+    const conv = page.locator('[data-conversation]');
+    await expect(conv).toBeVisible();
+
+    const approvalEntry = conv.locator('[data-conversation-entry][data-type="approval"]');
+    await expect(approvalEntry).toHaveCount(1);
+    await expect(approvalEntry).toHaveAttribute('data-role', 'user');
+  });
+
+  test('plan conversation entries do not have .conversation__preview child', async ({
+    page,
+  }) => {
+    const session = harness.sm.createSession('My plan text.');
+
+    await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+
+    const planEntry = page.locator('[data-conversation-entry][data-type="plan"]').first();
+    await expect(planEntry).toBeVisible();
+
+    // Plan entries must NOT have a preview element.
+    await expect(planEntry.locator('.conversation__preview')).toHaveCount(0);
+  });
 });

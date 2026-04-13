@@ -180,4 +180,33 @@ test.describe('annotation', () => {
     await expect(page.locator('[data-comment]')).toHaveCount(2);
     await expect(page.locator('main mark[data-comment-id]')).toHaveCount(2);
   });
+
+  test('selection outside any [data-plan-block] leaves placeholder visible', async ({
+    page,
+  }) => {
+    const session = harness.sm.createSession(SAMPLE_PLAN);
+    await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+    await page.locator('h1').waitFor();
+
+    // Select text that is NOT inside a [data-plan-block] (e.g. the sidebar heading).
+    await page.evaluate(() => {
+      const sidebar = document.querySelector('[data-sidebar] h2');
+      if (!sidebar || !sidebar.firstChild) return;
+      const textNode = sidebar.firstChild as Text;
+      if (!textNode.textContent) return;
+      const range = document.createRange();
+      range.setStart(textNode, 0);
+      range.setEnd(textNode, textNode.textContent.length);
+      const sel = window.getSelection();
+      if (!sel) return;
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.dispatchEvent(new Event('selectionchange'));
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+
+    // Placeholder should still be showing; no "Add comment" button.
+    await expect(page.locator('[data-new-comment-placeholder]')).toBeVisible();
+    await expect(page.getByRole('button', { name: /add comment/i })).toHaveCount(0);
+  });
 });

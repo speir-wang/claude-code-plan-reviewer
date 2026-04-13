@@ -186,4 +186,72 @@ test.describe('feedback / approval submission', () => {
     await expect(page.locator('[data-action="send-feedback"]')).toBeVisible();
     await expect(page.locator('[data-action="approve-with-notes"]')).toBeVisible();
   });
+
+  test('network error during POST leaves buttons visible (no state transition)', async ({
+    page,
+  }) => {
+    const session = harness.sm.createSession(SAMPLE_PLAN);
+
+    await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+    await page.locator('h1').waitFor();
+
+    // Add a comment so Send Feedback is enabled.
+    await selectInHeading(page, 'Dark');
+    await page.getByRole('button', { name: /add comment/i }).click();
+    await page.locator('textarea[data-comment-editor]').fill('a comment');
+    await page.getByRole('button', { name: /^save$/i }).click();
+
+    // Abort the feedback POST so it results in a network error.
+    await page.route('**/feedback', (route) => route.abort());
+
+    await page.locator('[data-action="send-feedback"]').click();
+
+    // Status message should NOT appear; buttons should still be visible.
+    await expect(page.locator('[data-submission-status]')).toHaveCount(0);
+    await expect(page.locator('[data-action="send-feedback"]')).toBeVisible();
+  });
+
+  test('status message is singular when exactly 1 comment is sent', async ({ page }) => {
+    const session = harness.sm.createSession(SAMPLE_PLAN);
+
+    await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+    await page.locator('h1').waitFor();
+
+    // Add exactly 1 comment.
+    await selectInHeading(page, 'Dark');
+    await page.getByRole('button', { name: /add comment/i }).click();
+    await page.locator('textarea[data-comment-editor]').fill('one comment');
+    await page.getByRole('button', { name: /^save$/i }).click();
+
+    await page.locator('[data-action="send-feedback"]').click();
+    await expect(page.locator('[data-submission-status]')).toBeVisible();
+
+    const text = await page.locator('[data-submission-status]').textContent();
+    expect(text).toMatch(/1 comment[^s]/);
+    expect(text).not.toMatch(/1 comments/);
+  });
+
+  test('status message is plural when more than 1 comment is sent', async ({ page }) => {
+    const session = harness.sm.createSession(SAMPLE_PLAN);
+
+    await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+    await page.locator('h1').waitFor();
+
+    // Add 2 comments on different anchor words.
+    await selectInHeading(page, 'Dark');
+    await page.getByRole('button', { name: /add comment/i }).click();
+    await page.locator('textarea[data-comment-editor]').fill('comment one');
+    await page.getByRole('button', { name: /^save$/i }).click();
+
+    await selectInHeading(page, 'Add');
+    await page.getByRole('button', { name: /add comment/i }).click();
+    await page.locator('textarea[data-comment-editor]').fill('comment two');
+    await page.getByRole('button', { name: /^save$/i }).click();
+
+    await page.locator('[data-action="send-feedback"]').click();
+    await expect(page.locator('[data-submission-status]')).toBeVisible();
+
+    const text = await page.locator('[data-submission-status]').textContent();
+    expect(text).toMatch(/2 comments/);
+  });
 });

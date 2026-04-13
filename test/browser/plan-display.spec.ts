@@ -123,4 +123,32 @@ test.describe('plan display', () => {
     await page.goto(`${harness.baseUrl}/`);
     await expect(page.locator('body')).toContainText(/no session selected/i);
   });
+
+  test('shows HTTP error message when server returns a non-404 error', async ({ page }) => {
+    const session = harness.sm.createSession(SAMPLE_PLAN);
+
+    // Intercept the session API request and return 500.
+    await page.route(`**/api/sessions/${session.id}`, (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'internal error' }) }),
+    );
+
+    await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+    await expect(page.locator('body')).toContainText(/Failed to load session \(HTTP 500\)/);
+  });
+
+  test('shows "Session has no plan versions yet." when planVersions is empty', async ({ page }) => {
+    const session = harness.sm.createSession(SAMPLE_PLAN);
+
+    // Return a session with empty planVersions array.
+    await page.route(`**/api/sessions/${session.id}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ session: { id: session.id, status: 'active', planVersions: [], conversation: [] } }),
+      }),
+    );
+
+    await page.goto(`${harness.baseUrl}/?session=${session.id}`);
+    await expect(page.locator('body')).toContainText(/Session has no plan versions yet/);
+  });
 });

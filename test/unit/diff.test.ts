@@ -166,4 +166,19 @@ describe('resolveCommentsAgainstDiff', () => {
     const segs = computeInlineDiff('x', 'y');
     expect(resolveCommentsAgainstDiff([], segs)).toEqual([]);
   });
+
+  it('marks a comment resolved when an insertion lands strictly inside its anchor range', () => {
+    // Construct segments manually: "hello " is unchanged, then "NEW " is added
+    // at position 6 (strictly inside the anchor [0, 12)), then "world" is unchanged.
+    // The anchor spans [0, 12) ("hello world"), and the insertion is at oldCursor=6
+    // which is strictly inside the range.
+    const segments: DiffSegment[] = [
+      { text: 'hello ', type: 'unchanged' },  // oldCursor: 0 → 6
+      { text: 'NEW ', type: 'added' },         // insertionPoint at 6
+      { text: 'world', type: 'unchanged' },   // oldCursor: 6 → 11
+    ];
+    const comment = mkComment('c1', 'hello world', 0, 11);
+    const [resolved] = resolveCommentsAgainstDiff([comment], segments);
+    expect(resolved!.resolved).toBe(true);
+  });
 });
