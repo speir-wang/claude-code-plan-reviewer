@@ -86,4 +86,11 @@ describe('formatPreview', () => {
     expect(result).not.toContain('<plan_review');
     expect(result).not.toContain('<note>');
   });
+
+  it('returns raw content for clarification when no <answer> tag is present', () => {
+    // Exercises the `answer ?? content` fallback in formatPreview.
+    const raw = 'just raw clarification text without tags';
+    const result = formatPreview('clarification', raw);
+    expect(result).toBe(raw);
+  });
 });
