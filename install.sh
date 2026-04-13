@@ -86,10 +86,10 @@ if ! $DRY_RUN; then
     try { cfg = JSON.parse(fs.readFileSync(p, 'utf8')); } catch {}
     if (!cfg.hooks) cfg.hooks = {};
     if (!cfg.hooks.PostToolUse) cfg.hooks.PostToolUse = [];
-    const exists = cfg.hooks.PostToolUse.some(h => h.matcher === 'submit_plan');
+    const exists = cfg.hooks.PostToolUse.some(h => h.matcher === 'mcp__plan-reviewer__submit_plan');
     if (!exists) {
       cfg.hooks.PostToolUse.push({
-        matcher: 'submit_plan',
+        matcher: 'mcp__plan-reviewer__submit_plan',
         command: '$POLL_SCRIPT',
         asyncRewake: true,
       });

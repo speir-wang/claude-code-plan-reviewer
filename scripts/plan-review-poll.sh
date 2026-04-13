@@ -6,8 +6,15 @@
 # approval, then exits with code 2 so Claude Code rewakes with the feedback
 # content injected as a system message.
 #
+# Input:
+#   stdin — JSON payload from Claude Code PostToolUse hook:
+#     {
+#       "tool_name": "mcp__plan-reviewer__submit_plan",
+#       "tool_input": { "plan": "..." },
+#       "tool_response": [{ "type": "text", "text": "...<session_id>...</session_id>..." }]
+#     }
+#
 # Environment:
-#   TOOL_RESULT  — the text content returned by the submit_plan tool call
 #   PLAN_REVIEWER_PORT — HTTP port (default: 3456)
 #   PLAN_REVIEWER_POLL_TIMEOUT — max seconds to poll (default: 3600)
 #
@@ -21,8 +28,20 @@ PORT="${PLAN_REVIEWER_PORT:-3456}"
 BASE_URL="http://127.0.0.1:${PORT}"
 MAX_POLL_SECONDS="${PLAN_REVIEWER_POLL_TIMEOUT:-3600}"
 
-# Extract sessionId from <session_id>...</session_id> in the tool result.
-SESSION_ID="$(echo "${TOOL_RESULT:-}" | grep -oP '(?<=<session_id>)[^<]+' || true)"
+# Extract sessionId from the JSON payload passed on stdin by Claude Code.
+# tool_response is a flat array: [{ "type": "text", "text": "...<session_id>...</session_id>..." }]
+SESSION_ID="$(cat | node -e "
+  let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
+    try {
+      const input = JSON.parse(d);
+      const arr = Array.isArray(input.tool_response) ? input.tool_response : [];
+      const text = arr.map(c => c.text || '').join('');
+      const m = text.match(/<session_id>([^<]+)<\/session_id>/);
+      console.log(m ? m[1] : '');
+    } catch { console.log(''); }
+  });
+" || true)"
+
 if [[ -z "$SESSION_ID" ]]; then
   exit 0
 fi
