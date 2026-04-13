@@ -6,6 +6,12 @@
 # approval, then exits with code 2 so Claude Code rewakes with the feedback
 # content injected as a system message.
 #
+# Multiple rounds of feedback are buffered: the script does not exit after the
+# first delivery. Instead it resets its baseline and keeps watching the same
+# session so subsequent feedback rounds are not lost if Claude fails to call
+# submit_plan again. All accumulated feedback is delivered in a single rewake
+# when the session goes quiet (no new entries within MAX_POLL_SECONDS).
+#
 # Input:
 #   stdin — JSON payload from Claude Code PostToolUse hook:
 #     {
@@ -60,7 +66,12 @@ BASELINE_LENGTH="$(echo "$BASELINE_RESPONSE" | node -e "
 ")"
 
 ELAPSED=0
+HAS_FEEDBACK=false
 
+# Outer loop: instead of exiting after the first feedback delivery, reset the
+# baseline and keep watching so subsequent rounds of feedback are not lost if
+# Claude fails to call submit_plan again. All feedback rounds are written to
+# stdout; a single exit 2 at the end delivers them all to Claude at once.
 while [[ $ELAPSED -lt $MAX_POLL_SECONDS ]]; do
   sleep 3
   ELAPSED=$((ELAPSED + 3))
@@ -104,7 +115,11 @@ while [[ $ELAPSED -lt $MAX_POLL_SECONDS ]]; do
       echo "$CONTENT"
       echo ""
       echo "<session_id>${SESSION_ID}</session_id>"
-      exit 2
+      # Reset baseline and elapsed so we keep watching for further feedback.
+      BASELINE_LENGTH="$CURRENT_LENGTH"
+      ELAPSED=0
+      HAS_FEEDBACK=true
+      continue
     fi
     # New entry but not from user (e.g. claude submitted a new plan) —
     # update baseline and keep polling.
@@ -112,5 +127,8 @@ while [[ $ELAPSED -lt $MAX_POLL_SECONDS ]]; do
   fi
 done
 
-# Timeout — exit without rewake.
+# Exit with code 2 to rewake Claude if any feedback was collected, else 0.
+if $HAS_FEEDBACK; then
+  exit 2
+fi
 exit 0
