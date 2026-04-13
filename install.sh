@@ -41,7 +41,7 @@ log "Building project (npm run build)…"
 run npm run build --prefix "$PROJECT_DIR"
 
 # --- Step 2: Install dist ----------------------------------------------------
-log "Copying dist/ to $INSTALL_DIR…"
+log "Copying dist/ to $INSTALL_DIR..."
 run mkdir -p "$INSTALL_DIR"
 if ! $DRY_RUN; then
   cp -R "$PROJECT_DIR/dist" "$INSTALL_DIR/"
@@ -86,10 +86,10 @@ if ! $DRY_RUN; then
     try { cfg = JSON.parse(fs.readFileSync(p, 'utf8')); } catch {}
     if (!cfg.hooks) cfg.hooks = {};
     if (!cfg.hooks.PostToolUse) cfg.hooks.PostToolUse = [];
-    const exists = cfg.hooks.PostToolUse.some(h => h.matcher === 'submit_plan');
+    const exists = cfg.hooks.PostToolUse.some(h => h.matcher === 'mcp__plan-reviewer__submit_plan');
     if (!exists) {
       cfg.hooks.PostToolUse.push({
-        matcher: 'submit_plan',
+        matcher: 'mcp__plan-reviewer__submit_plan',
         command: '$POLL_SCRIPT',
         asyncRewake: true,
       });
@@ -97,7 +97,7 @@ if ! $DRY_RUN; then
     fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + '\n', 'utf8');
   "
 else
-  echo "[dry-run] Add PostToolUse asyncRewake hook for submit_plan"
+  echo "[dry-run] Add PostToolUse asyncRewake hook for mcp__plan-reviewer__submit_plan"
   echo "[dry-run]   command: $POLL_SCRIPT"
 fi
 

@@ -6,8 +6,11 @@
 # approval, then exits with code 2 so Claude Code rewakes with the feedback
 # content injected as a system message.
 #
+# Input (stdin):
+#   JSON from Claude Code: { tool_name, tool_input, tool_response }
+#   tool_response.content[0].text contains the submit_plan output with <session_id>.
+#
 # Environment:
-#   TOOL_RESULT  — the text content returned by the submit_plan tool call
 #   PLAN_REVIEWER_PORT — HTTP port (default: 3456)
 #   PLAN_REVIEWER_POLL_TIMEOUT — max seconds to poll (default: 3600)
 #
@@ -21,8 +24,20 @@ PORT="${PLAN_REVIEWER_PORT:-3456}"
 BASE_URL="http://127.0.0.1:${PORT}"
 MAX_POLL_SECONDS="${PLAN_REVIEWER_POLL_TIMEOUT:-3600}"
 
-# Extract sessionId from <session_id>...</session_id> in the tool result.
-SESSION_ID="$(echo "${TOOL_RESULT:-}" | grep -oP '(?<=<session_id>)[^<]+' || true)"
+# Read hook input from stdin (Claude Code passes PostToolUse data as JSON on stdin).
+# tool_response is a flat array: [{ type, text }]
+SESSION_ID="$(cat | node -e "
+  let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
+    try {
+      const input = JSON.parse(d);
+      const content = input.tool_response;
+      const text = Array.isArray(content)
+        ? content.map(c => c.text || '').join('')
+        : String(content || '');
+      const m = text.match(/<session_id>([^<]+)<\/session_id>/);
+      console.log(m ? m[1] : '');
+    } catch { console.log(''); }
+  });" || true)"
 if [[ -z "$SESSION_ID" ]]; then
   exit 0
 fi
