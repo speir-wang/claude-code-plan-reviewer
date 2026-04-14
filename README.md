@@ -162,7 +162,6 @@ Your feedback is returned to Claude as structured XML:
 npm install               # install dependencies
 npm run dev               # start with tsx (auto-reloads)
 npm test                  # run all vitest tests
-npm run test:browser      # run Playwright browser tests
 npm run typecheck         # TypeScript type checking
 npm run build             # full production build
 ```
@@ -195,16 +194,9 @@ scripts/
 
 ### Testing
 
-The project uses an integration-heavy test pyramid:
-
-- **Unit tests** (vitest) — diff algorithm, XML escaping, session persistence
-- **Integration tests** (vitest + supertest) — HTTP endpoints, non-blocking submit, MCP stdio process
-- **Browser tests** (Playwright) — full UI flows with real DOM events and a real server
-
 ```bash
 npm run test:unit         # unit tests only
 npm run test:integration  # integration tests only
-npm run test:browser      # Playwright browser tests (requires build)
 ```
 
 ## Troubleshooting
