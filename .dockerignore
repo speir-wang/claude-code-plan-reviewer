@@ -7,6 +7,5 @@ coverage/
 .cache/
 *.log
 test-results/
-playwright-report/
 .env
 .env.*
